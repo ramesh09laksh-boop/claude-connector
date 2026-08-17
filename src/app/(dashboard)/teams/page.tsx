@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { member, team, teamMember } from "@/lib/db/auth-schema";
-import { requireUser } from "@/lib/auth-guards";
+import { requireUserOrRedirect } from "@/lib/auth-guards";
 
 import { CreateTeamForm } from "./create-team-form";
 
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 export default async function TeamsPage() {
-  const session = await requireUser();
+  const session = await requireUserOrRedirect();
 
   const memberships = await db
     .select({ organizationId: member.organizationId, role: member.role })

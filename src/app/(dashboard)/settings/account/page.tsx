@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { requireUser } from "@/lib/auth-guards";
+import { requireUserOrRedirect } from "@/lib/auth-guards";
 import { emailConfigured } from "@/lib/email";
 import { getAccountFootprint } from "@/lib/actions/account";
 
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AccountSettingsPage() {
-  const session = await requireUser();
+  const session = await requireUserOrRedirect();
   const footprint = await getAccountFootprint();
 
   return (

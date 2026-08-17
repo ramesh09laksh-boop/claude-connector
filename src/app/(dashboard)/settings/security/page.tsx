@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { requireUser } from "@/lib/auth-guards";
+import { requireUserOrRedirect } from "@/lib/auth-guards";
 
 import { PasswordCard } from "./password-card";
 import { SessionsCard } from "./sessions-card";
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function SecuritySettingsPage() {
-  const session = await requireUser();
+  const session = await requireUserOrRedirect();
 
   return (
     <>

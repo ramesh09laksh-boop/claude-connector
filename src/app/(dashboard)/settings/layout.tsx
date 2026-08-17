@@ -1,4 +1,4 @@
-import { requireUser } from "@/lib/auth-guards";
+import { getOptionalUser } from "@/lib/auth-guards";
 import { isPlatformAdmin } from "@/lib/auth";
 
 import { SettingsNav } from "./settings-nav";
@@ -15,10 +15,14 @@ export default async function SettingsLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await requireUser();
+  // Optional, not required: the dashboard layout above already redirects a
+  // signed-out visitor, and Next renders sibling layouts in parallel — so
+  // throwing here just logs an error the redirect has already handled.
+  // The pages inside still call requireUser()/requireAdmin() themselves.
+  const session = await getOptionalUser();
   // Hiding the System link is presentation; the page itself calls
   // requireAdmin() on the server.
-  const admin = await isPlatformAdmin(session.user.id);
+  const admin = session ? await isPlatformAdmin(session.user.id) : false;
 
   return (
     <div className="mx-auto w-full max-w-3xl px-6 py-10">

@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 
 import { db } from "@/lib/db";
 import { member } from "@/lib/db/auth-schema";
-import { requireUser } from "@/lib/auth-guards";
+import { requireUserOrRedirect } from "@/lib/auth-guards";
 
 import { OnboardingForm } from "./onboarding-form";
 
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function OnboardingPage() {
-  const session = await requireUser();
+  const session = await requireUserOrRedirect();
 
   const existing = await db
     .select({ id: member.id })

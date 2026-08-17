@@ -1,6 +1,7 @@
 import "server-only";
 
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { auth, isPlatformAdmin } from "@/lib/auth";
 
@@ -35,6 +36,23 @@ export async function requireUser(): Promise<AppSession> {
 
 export async function getOptionalUser(): Promise<AppSession | null> {
   return auth.api.getSession({ headers: await headers() });
+}
+
+/**
+ * The same check as `requireUser`, for use in a *page*.
+ *
+ * Next renders sibling layouts and pages in parallel, so a page that throws
+ * while the layout above it is already redirecting prints a stack trace for
+ * every signed-out visit — noise that would eventually hide a real error.
+ * `redirect()` is Next's own control flow and is handled silently.
+ *
+ * Server actions keep using `requireUser`: an action wants an error it can
+ * return to the caller, not a navigation.
+ */
+export async function requireUserOrRedirect(): Promise<AppSession> {
+  const session = await getOptionalUser();
+  if (!session) redirect("/sign-in");
+  return session;
 }
 
 /**

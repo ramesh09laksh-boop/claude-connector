@@ -3,7 +3,7 @@ import { and, asc, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { member, team, teamMember } from "@/lib/db/auth-schema";
-import { requireUser } from "@/lib/auth-guards";
+import { requireUserOrRedirect } from "@/lib/auth-guards";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  * board. Nobody should land on a page that only says "Welcome back".
  */
 export default async function DashboardPage() {
-  const session = await requireUser();
+  const session = await requireUserOrRedirect();
 
   const memberships = await db
     .select({ organizationId: member.organizationId, role: member.role })

@@ -11,7 +11,11 @@ import {
 import { db } from "@/lib/db";
 import { activityLog, emailLog } from "@/lib/db/schema";
 import { user } from "@/lib/db/auth-schema";
-import { NotFoundError, requireAdmin } from "@/lib/auth-guards";
+import {
+  NotFoundError,
+  UnauthenticatedError,
+  requireAdmin,
+} from "@/lib/auth-guards";
 import { getSystemChecks } from "@/lib/system-status";
 
 import { EmailLogTable } from "./email-log-table";
@@ -29,7 +33,13 @@ async function isAdminViewer(): Promise<boolean> {
     await requireAdmin();
     return true;
   } catch (cause) {
-    if (cause instanceof NotFoundError) return false;
+    // Not an admin, and not signed in at all, both mean "you don't see this".
+    // A signed-out visitor is redirected by the dashboard layout above; without
+    // catching the unauthenticated case here, that redirect still wins but the
+    // throw is logged as an error on every signed-out request.
+    if (cause instanceof NotFoundError || cause instanceof UnauthenticatedError) {
+      return false;
+    }
     throw cause;
   }
 }
