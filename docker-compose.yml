@@ -1,0 +1,24 @@
+services:
+  db:
+    # Intended image is `postgres:alpine` (untagged on purpose, so a fresh
+    # project gets current stable Postgres). This machine's network intercepts
+    # TLS to registry-1.docker.io, so that pull fails; `ankane/pgvector` is a
+    # Postgres 15 image already cached locally and is used instead. Switch the
+    # line below back to `postgres:alpine` once Docker Hub is reachable — the
+    # app uses no pgvector feature, so nothing else changes.
+    image: ${POSTGRES_IMAGE:-ankane/pgvector:latest}
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  pgdata:

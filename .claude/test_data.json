@@ -1,0 +1,33 @@
+{
+  "_note": "Reusable fixtures for Playwright runs against Lanes. Reuse these accounts; do not invent new ones per test. Local-only credentials against a throwaway Docker Postgres.",
+  "baseUrl": "http://localhost:3000",
+  "accounts": {
+    "owner": {
+      "name": "Ada Lovelace",
+      "email": "ada@lanes.test",
+      "password": "lanes-owner-passphrase",
+      "role": "first account on the instance, so also the platform admin",
+      "organisation": "Ada's organisation",
+      "team": "Engineering"
+    },
+    "joiner": {
+      "name": "Grace Hopper",
+      "email": "grace@lanes.test",
+      "password": "grace-brand-new-passphrase",
+      "_passwordNote": "changed from lanes-joiner-passphrase while testing the forgot-password flow",
+      "role": "joined Engineering through an invite link, later promoted to admin; also a member of Turing Institute, so she exercises the organisation switcher"
+    },
+    "outsider": {
+      "name": "Alan Turing",
+      "email": "alan@lanes.test",
+      "password": "lanes-outsider-passphrase",
+      "role": "belongs to a separate organisation; used for cross-tenant isolation probes",
+      "organisation": "Turing Institute",
+      "team": "Cryptanalysis"
+    }
+  },
+  "cards": {
+    "sample": "Write the onboarding email",
+    "second": "Fix the board polling"
+  }
+}
