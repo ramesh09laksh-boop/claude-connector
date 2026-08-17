@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Board } from "@/components/board/board";
 import { getAssignableMembers, getBoardState } from "@/lib/boards";
 import { NotFoundError, requireTeamAccess } from "@/lib/board-guards";
+import { UnauthenticatedError } from "@/lib/auth-guards";
 import type { BoardState } from "@/lib/boards";
 import type { OrgRole } from "@/lib/permissions";
 
@@ -52,8 +53,12 @@ async function loadBoard(teamId: string): Promise<BoardPageData | null> {
     };
   } catch (cause) {
     // Not-found rather than forbidden: a 403 would confirm that a board in
-    // somebody else's organisation exists.
-    if (cause instanceof NotFoundError) return null;
+    // somebody else's organisation exists. A signed-out visitor is redirected
+    // by the dashboard layout; catching it here just keeps that redirect from
+    // logging a stack trace it has already handled.
+    if (cause instanceof NotFoundError || cause instanceof UnauthenticatedError) {
+      return null;
+    }
     throw cause;
   }
 }

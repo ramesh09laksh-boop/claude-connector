@@ -1,4 +1,5 @@
 import { desc, eq } from "drizzle-orm";
+import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import {
@@ -45,20 +46,11 @@ async function isAdminViewer(): Promise<boolean> {
 }
 
 export default async function SystemPage() {
-  // A guard throwing in a server component renders a stack trace; a non-admin
-  // hitting this URL should see a page, not a crash.
-  if (!(await isAdminViewer())) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Not available</CardTitle>
-          <CardDescription>
-            This page is only for the person who set this instance of Lanes up.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
+  // Refused by the server, not merely hidden. `notFound()` answers 404 rather
+  // than 200 — a 200 here would say "this page exists, you just can't have it"
+  // — while the sibling not-found.tsx keeps it a readable page rather than the
+  // stack trace a bare throw would render.
+  if (!(await isAdminViewer())) notFound();
 
   const checks = await getSystemChecks();
 

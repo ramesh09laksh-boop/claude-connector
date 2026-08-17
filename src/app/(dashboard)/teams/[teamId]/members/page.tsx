@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { getTeamMembers, type TeamMemberSummary } from "@/lib/boards";
 import { NotFoundError, requireTeamAccess } from "@/lib/board-guards";
+import { UnauthenticatedError } from "@/lib/auth-guards";
 import { getActiveInviteLinks } from "@/lib/invites";
 import { siteUrl } from "@/lib/site";
 import type { OrgRole } from "@/lib/permissions";
@@ -60,7 +61,11 @@ async function loadMembers(teamId: string): Promise<MembersPageData | null> {
       })),
     };
   } catch (cause) {
-    if (cause instanceof NotFoundError) return null;
+    // Same reasoning as the board page: not-found rather than forbidden, and a
+    // signed-out visitor is already being redirected by the layout above.
+    if (cause instanceof NotFoundError || cause instanceof UnauthenticatedError) {
+      return null;
+    }
     throw cause;
   }
 }
