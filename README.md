@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lanes
 
-## Getting Started
+Every team's work, in its lane.
 
-First, run the development server:
+A Kanban board for teams: an organisation holds teams, each team has exactly
+one board, and cards move between columns by drag and drop — by pointer or by
+keyboard. Sign-in is email and password.
+
+## Running it
+
+Docker Desktop needs to be running.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run db:up      # Postgres in Docker
+npm run db:migrate # apply migrations
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Sign up first.** The first account created on an instance becomes the
+platform admin, which is the only account that can see `/settings/system`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## What's here
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| | |
+| --- | --- |
+| Organisations, teams, roles | Better Auth's `organization` plugin with teams enabled |
+| One board per team | Enforced by a unique constraint on `board.team_id` |
+| Drag and drop | `@dnd-kit` — space to lift, arrows to move, space to drop |
+| Live updates | The board polls every 3 seconds; unchanged polls answer `204` |
+| Invite links | Reusable, role-baked, expiring, revocable — `team_invite_link` |
+| Email | Resend. With no API key set, messages print to the terminal |
+| System page | What's configured, what happened, and every email sent |
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+| Script | Does |
+| --- | --- |
+| `npm run dev` | Development server |
+| `npm run build` | Runs migrations, then builds |
+| `npm start` | Production server |
+| `npm run lint` | ESLint |
+| `npm run db:up` / `db:down` | Start / stop Postgres |
+| `npm run db:generate` | Write a migration from the schema — **read the SQL** |
+| `npm run db:migrate` | Apply pending migrations |
+| `npm run db:studio` | Browse the database |
+| `npm run email:dev` | Preview the email templates |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+There is deliberately no `db:push`. Every schema change produces a reviewable
+migration in `drizzle/`, which is committed as source code.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Environment
 
-## Deploy on Vercel
+`.env` holds the local values; nothing secret is ever committed.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Variable | Needed for |
+| --- | --- |
+| `POSTGRES_URL` | The database — required, at build time as well as runtime |
+| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL` | Sessions |
+| `RESEND_API_KEY` | Sending email for real. Empty means "print to the terminal" |
+| `RESEND_WEBHOOK_SECRET` | Turning `sent` into `delivered` / `bounced` |
+| `APP_URL` | The public address, used by the sitemap and canonical links |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Every integration switches on the presence of its variable, so the app runs end
+to end with none of the optional ones set.
+
+## Before it goes live
+
+- Set `entity`, `contactEmail` and `jurisdiction` in `src/lib/legal.ts`. Until
+  you do, the privacy and terms pages show a yellow marker where each one
+  belongs, rather than a plausible-looking placeholder.
+- Set `APP_URL` on the host, or the sitemap and canonical links say
+  `localhost`.
+- Add a Resend key and a verified domain to email anyone other than yourself.
