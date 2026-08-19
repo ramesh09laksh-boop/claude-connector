@@ -9,12 +9,12 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { member, organization, team, teamMember } from "@/lib/db/auth-schema";
 import { logActivity } from "@/lib/activity";
+import { sessionActor } from "@/lib/actor";
 import {
   NotFoundError,
   requireOrgMember,
   requireOrgPermission,
   requireTeamAccess,
-  requireUser,
 } from "@/lib/board-guards";
 import { orgRoles, roleRank, type OrgRole } from "@/lib/permissions";
 import { runAction, type ActionResult } from "./shared";
@@ -55,7 +55,7 @@ export async function createOrganizationWithTeam(input: {
       })
       .parse(input);
 
-    const session = await requireUser();
+    const actor = await sessionActor();
     const requestHeaders = await headers();
 
     const org = await auth.api.createOrganization({
@@ -63,7 +63,7 @@ export async function createOrganizationWithTeam(input: {
       body: {
         name: parsed.organizationName,
         slug: slugify(parsed.organizationName),
-        userId: session.user.id,
+        userId: actor.userId,
       },
     });
 
@@ -83,7 +83,7 @@ export async function createOrganizationWithTeam(input: {
         .values({
           id: crypto.randomUUID(),
           teamId: created.id,
-          userId: session.user.id,
+          userId: actor.userId,
           createdAt: new Date(),
         })
         .onConflictDoNothing();
@@ -96,12 +96,12 @@ export async function createOrganizationWithTeam(input: {
       await logActivity(
         "organization.created",
         { organizationId: org.id, name: parsed.organizationName },
-        session.user.id,
+        actor.userId,
       );
       await logActivity(
         "team.created",
         { organizationId: org.id, teamId: created.id, name: parsed.teamName },
-        session.user.id,
+        actor.userId,
       );
 
       revalidatePath("/dashboard");
@@ -127,9 +127,11 @@ export async function createTeam(input: {
       })
       .parse(input);
 
-    const access = await requireOrgPermission(parsed.organizationId, {
-      team: ["create"],
-    });
+    const access = await requireOrgPermission(
+      await sessionActor(),
+      parsed.organizationId,
+      { team: ["create"] },
+    );
 
     const created = await auth.api.createTeam({
       headers: await headers(),
@@ -143,7 +145,7 @@ export async function createTeam(input: {
       .values({
         id: crypto.randomUUID(),
         teamId: created.id,
-        userId: access.session.user.id,
+        userId: access.actor.userId,
         createdAt: new Date(),
       })
       .onConflictDoNothing();
@@ -155,7 +157,7 @@ export async function createTeam(input: {
         teamId: created.id,
         name: parsed.name,
       },
-      access.session.user.id,
+      access.actor.userId,
     );
 
     revalidatePath("/dashboard");
@@ -173,7 +175,7 @@ export async function setActiveOrganization(input: {
 }): Promise<ActionResult<undefined>> {
   return runAction(async () => {
     const parsed = z.object({ organizationId: z.string().min(1) }).parse(input);
-    await requireOrgMember(parsed.organizationId);
+    await requireOrgMember(await sessionActor(), parsed.organizationId);
 
     await auth.api.setActiveOrganization({
       headers: await headers(),
@@ -199,8 +201,8 @@ export async function changeMemberRole(input: {
       })
       .parse(input);
 
-    const access = await requireTeamAccess(parsed.teamId);
-    await requireOrgPermission(access.organizationId, { member: ["update"] });
+    const access = await requireTeamAccess(await sessionActor(), parsed.teamId);
+    await requireOrgPermission(access.actor, access.organizationId, { member: ["update"] });
 
     const target = await loadMember(access.organizationId, parsed.userId);
 
@@ -229,7 +231,7 @@ export async function changeMemberRole(input: {
         from: target.role,
         to: parsed.role,
       },
-      access.session.user.id,
+      access.actor.userId,
     );
 
     revalidatePath(`/teams/${parsed.teamId}/members`);
@@ -246,8 +248,8 @@ export async function removeMember(input: {
       .object({ teamId: z.string().min(1), userId: z.string().min(1) })
       .parse(input);
 
-    const access = await requireTeamAccess(parsed.teamId);
-    await requireOrgPermission(access.organizationId, { member: ["delete"] });
+    const access = await requireTeamAccess(await sessionActor(), parsed.teamId);
+    await requireOrgPermission(access.actor, access.organizationId, { member: ["delete"] });
 
     const target = await loadMember(access.organizationId, parsed.userId);
 
@@ -278,7 +280,7 @@ export async function removeMember(input: {
     await logActivity(
       "member.removed",
       { organizationId: access.organizationId, userId: parsed.userId },
-      access.session.user.id,
+      access.actor.userId,
     );
 
     revalidatePath(`/teams/${parsed.teamId}/members`);

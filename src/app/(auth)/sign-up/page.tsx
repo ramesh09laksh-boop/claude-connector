@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { AuthFormShell } from "@/components/auth-form-shell";
+import { carryQuery, oauthResumeUrl } from "@/lib/oauth-resume";
 import { safeRedirect } from "@/lib/safe-redirect";
 
 import { SignUpForm } from "./sign-up-form";
@@ -14,13 +15,21 @@ export const metadata: Metadata = {
 export default async function SignUpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ redirect?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { redirect } = await searchParams;
-  const redirectTo = safeRedirect(redirect);
+  const params = await searchParams;
+  const redirectParam = Array.isArray(params.redirect)
+    ? params.redirect[0]
+    : params.redirect;
+  const redirectTo = safeRedirect(redirectParam);
 
-  const signInHref =
-    redirectTo === "/dashboard"
+  // Signing up can also be the middle of connecting an MCP client, for someone
+  // who had no account yet. See lib/oauth-resume.ts.
+  const resumeTo = oauthResumeUrl(params);
+
+  const signInHref = resumeTo
+    ? `/sign-in?${carryQuery(params)}`
+    : redirectTo === "/dashboard"
       ? "/sign-in"
       : `/sign-in?redirect=${encodeURIComponent(redirectTo)}`;
 
@@ -37,7 +46,7 @@ export default async function SignUpPage({
         </>
       }
     >
-      <SignUpForm redirectTo={redirectTo} />
+      <SignUpForm redirectTo={redirectTo} resumeTo={resumeTo} />
     </AuthFormShell>
   );
 }

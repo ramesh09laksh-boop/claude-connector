@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { Board } from "@/components/board/board";
 import { getAssignableMembers, getBoardState } from "@/lib/boards";
+import { sessionActor } from "@/lib/actor";
 import { NotFoundError, requireTeamAccess } from "@/lib/board-guards";
 import { UnauthenticatedError } from "@/lib/auth-guards";
 import type { BoardState } from "@/lib/boards";
@@ -18,7 +19,7 @@ export async function generateMetadata({
 }: PageProps<"/teams/[teamId]">): Promise<Metadata> {
   const { teamId } = await params;
   try {
-    const access = await requireTeamAccess(teamId);
+    const access = await requireTeamAccess(await sessionActor(), teamId);
     return { title: access.team.name };
   } catch {
     return { title: "Board" };
@@ -38,7 +39,7 @@ type BoardPageData = {
  */
 async function loadBoard(teamId: string): Promise<BoardPageData | null> {
   try {
-    const access = await requireTeamAccess(teamId);
+    const access = await requireTeamAccess(await sessionActor(), teamId);
     const [state, members] = await Promise.all([
       getBoardState(teamId),
       getAssignableMembers(teamId),

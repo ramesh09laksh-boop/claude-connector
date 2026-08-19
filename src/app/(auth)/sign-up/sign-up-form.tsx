@@ -10,7 +10,14 @@ import { Label } from "@/components/ui/label";
 
 const MIN_PASSWORD_LENGTH = 8;
 
-export function SignUpForm({ redirectTo }: { redirectTo: string }) {
+export function SignUpForm({
+  redirectTo,
+  resumeTo,
+}: {
+  redirectTo: string;
+  /** Set when signing up interrupted an OAuth authorisation. */
+  resumeTo?: string | null;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -48,6 +55,13 @@ export function SignUpForm({ redirectTo }: { redirectTo: string }) {
       setFormError(
         error.message ?? "We couldn't create that account. Try again in a moment.",
       );
+      return;
+    }
+
+    // Someone can arrive here mid-OAuth too: connecting Lanes to Claude without
+    // an account yet sends them to /sign-up. See lib/oauth-resume.ts.
+    if (resumeTo) {
+      window.location.href = resumeTo;
       return;
     }
 

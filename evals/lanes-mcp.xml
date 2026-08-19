@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Evaluations for the Lanes MCP server at [domain]/mcp.
+
+  Every question is read-only, independent of the others, and answerable from the
+  tools alone. They are written against the fixture board that
+  `scripts/seed-eval-board.mjs` creates — run that first, as a user who is an
+  owner of "Ada's organisation", or the answers below will not hold. The seed
+  script is idempotent, so re-running it restores exactly the state these answers
+  were verified against.
+
+  Questions deliberately avoid the exact words in the card titles, so they cannot
+  be resolved by matching a string: the model has to read the board, join cards to
+  their columns and assignees, and compare dates.
+
+  Run with:
+    node scripts/mcp-oauth-probe.mjs            # prints an access token
+    python scripts/evaluation.py -t http \
+      -u http://localhost:3000/mcp \
+      -H "Authorization: Bearer <token>" \
+      evals/lanes-mcp.xml
+-->
+<evaluation>
+  <qa_pair>
+    <question>On the Engineering board, one card is about replacing a credential that stops working every few months. Which lane is that card sitting in? Give the lane's name exactly as it appears.</question>
+    <answer>To Do</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Look at every card you can see across all of your teams that has a deadline. Whoever is responsible for the one falling earliest — what is that person's first name?</question>
+    <answer>Grace</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>How many cards on the Engineering board have nobody responsible for them? Answer with a number and nothing else.</question>
+    <answer>3</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Consider only the work on the Engineering board that has already been completed. One person is named on more of those cards than anyone else. Give their full name.</question>
+    <answer>Ada Lovelace</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>The Engineering board has a stage between work in progress and work that is finished. Exactly one card there has no deadline. What is that card's title?</question>
+    <answer>Redesign the empty state</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>One person in Ada's organisation holds the least privileged role. Counting every lane on the Engineering board, how many cards are they responsible for? Answer with a number and nothing else.</question>
+    <answer>4</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>True or False: every card in the Engineering board's final lane has a deadline set. Answer True or False and nothing else.</question>
+    <answer>True</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Of all the cards with deadlines on the Engineering board, one is due further ahead than any other. What is the email address of the person responsible for it?</question>
+    <answer>ada@lanes.test</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Ignoring anything already finished, and counting only cards that have both a deadline and someone responsible, one person on the Engineering board carries more than the other. What is their first name?</question>
+    <answer>Grace</answer>
+  </qa_pair>
+
+  <qa_pair>
+    <question>Take the person who is not an owner of Ada's organisation. Among their unfinished cards that have a deadline, find the one due soonest. Which lane is it in? Give the lane's name exactly as it appears.</question>
+    <answer>In review</answer>
+  </qa_pair>
+</evaluation>

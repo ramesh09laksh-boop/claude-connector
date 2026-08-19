@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 import { AuthFormShell } from "@/components/auth-form-shell";
+import { carryQuery, oauthResumeUrl } from "@/lib/oauth-resume";
 import { safeRedirect } from "@/lib/safe-redirect";
 
 import { SignInForm } from "./sign-in-form";
@@ -14,20 +15,34 @@ export const metadata: Metadata = {
 export default async function SignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ redirect?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { redirect } = await searchParams;
-  const redirectTo = safeRedirect(redirect);
+  const params = await searchParams;
+  const redirectParam = Array.isArray(params.redirect)
+    ? params.redirect[0]
+    : params.redirect;
+  const redirectTo = safeRedirect(redirectParam);
 
-  const signUpHref =
-    redirectTo === "/dashboard"
+  // Someone sent here mid-way through connecting an MCP client arrives with the
+  // whole authorize query attached. See lib/oauth-resume.ts.
+  const resumeTo = oauthResumeUrl(params);
+
+  // Carry the authorize query across, so someone who needs an account first
+  // still lands back in the flow they started.
+  const signUpHref = resumeTo
+    ? `/sign-up?${carryQuery(params)}`
+    : redirectTo === "/dashboard"
       ? "/sign-up"
       : `/sign-up?redirect=${encodeURIComponent(redirectTo)}`;
 
   return (
     <AuthFormShell
-      title="Welcome back"
-      subtitle="Sign in to see your team's board."
+      title={resumeTo ? "Sign in to continue" : "Welcome back"}
+      subtitle={
+        resumeTo
+          ? "Sign in, then choose whether to give the application access."
+          : "Sign in to see your team's board."
+      }
       footer={
         <>
           New to Lanes?{" "}
@@ -37,7 +52,7 @@ export default async function SignInPage({
         </>
       }
     >
-      <SignInForm redirectTo={redirectTo} />
+      <SignInForm redirectTo={redirectTo} resumeTo={resumeTo} />
     </AuthFormShell>
   );
 }

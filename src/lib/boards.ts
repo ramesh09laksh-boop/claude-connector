@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, count, eq, max } from "drizzle-orm";
+import { and, asc, count, eq, max, sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { board, boardColumn, card } from "@/lib/db/schema";
@@ -114,9 +114,17 @@ export async function getBoardState(teamId: string): Promise<BoardState | null> 
 }
 
 /**
- * A cheap "has anything changed?" token: the newest card timestamp plus the
- * card and column counts. Counts are in there because a delete moves no
- * timestamp forward — without them, removing a card would look like no change.
+ * A cheap "has anything changed?" token: the newest card timestamp, the card
+ * count, and a fingerprint of the columns. The card count is in there because a
+ * delete moves no timestamp forward — without it, removing a card would look
+ * like no change.
+ *
+ * The columns are fingerprinted by name and position rather than merely counted,
+ * because a rename and a reorder both leave the count alone. A count-only token
+ * meant an open board kept showing the old column names until something else
+ * happened to move it — invisible when the only editor was the person looking at
+ * the screen, and obvious as soon as an agent could rename a column over MCP
+ * while somebody had the board open.
  */
 export async function getBoardStateVersion(teamId: string): Promise<string> {
   const [head] = await db
@@ -133,13 +141,17 @@ export async function getBoardStateVersion(teamId: string): Promise<string> {
     .innerJoin(boardColumn, eq(boardColumn.id, card.columnId))
     .where(eq(boardColumn.boardId, head.boardId));
 
+  // Aggregated in SQL so this stays one round trip and returns a short token,
+  // however many columns the board has.
   const [columnStats] = await db
-    .select({ n: count() })
+    .select({
+      fingerprint: sql<string>`md5(coalesce(string_agg(${boardColumn.id} || ':' || ${boardColumn.position} || ':' || ${boardColumn.name}, ',' order by ${boardColumn.position}, ${boardColumn.id}), ''))`,
+    })
     .from(boardColumn)
     .where(eq(boardColumn.boardId, head.boardId));
 
   const latest = cardStats?.latest ? cardStats.latest.getTime() : 0;
-  return `${latest}:${cardStats?.n ?? 0}:${columnStats?.n ?? 0}`;
+  return `${latest}:${cardStats?.n ?? 0}:${columnStats?.fingerprint ?? ""}`;
 }
 
 export type TeamMemberSummary = {

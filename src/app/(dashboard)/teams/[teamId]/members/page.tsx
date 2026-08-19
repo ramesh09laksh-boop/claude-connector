@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
 import { getTeamMembers, type TeamMemberSummary } from "@/lib/boards";
+import { sessionActor } from "@/lib/actor";
 import { NotFoundError, requireTeamAccess } from "@/lib/board-guards";
 import { UnauthenticatedError } from "@/lib/auth-guards";
 import { getActiveInviteLinks } from "@/lib/invites";
@@ -35,7 +36,7 @@ type MembersPageData = {
 /** Guards inside the try, JSX outside it — see the note on the board page. */
 async function loadMembers(teamId: string): Promise<MembersPageData | null> {
   try {
-    const access = await requireTeamAccess(teamId);
+    const access = await requireTeamAccess(await sessionActor(), teamId);
 
     // Owner/Admin only. A Member reaching this URL gets the same not-found they
     // would get for a team in another organisation.
@@ -48,9 +49,9 @@ async function loadMembers(teamId: string): Promise<MembersPageData | null> {
 
     return {
       teamName: access.team.name,
-      viewerId: access.session.user.id,
+      viewerId: access.actor.userId,
       viewerRole: access.role,
-      emailVerified: access.session.user.emailVerified,
+      emailVerified: access.actor.emailVerified,
       members,
       links: links.map((link) => ({
         id: link.id,

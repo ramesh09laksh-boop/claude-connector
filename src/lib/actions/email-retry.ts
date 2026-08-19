@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { emailLog } from "@/lib/db/schema";
 import { requireAdmin, NotFoundError } from "@/lib/auth-guards";
 import { sendEmail, type EmailTemplate } from "@/lib/email";
+import { siteUrl } from "@/lib/site";
 import VerifyEmail from "@/emails/verify-email";
 import ResetPassword from "@/emails/reset-password";
 import ConfirmDelete from "@/emails/confirm-delete";
@@ -42,16 +43,14 @@ export async function retryEmail(input: {
 
     if (!row) throw new NotFoundError("That email is no longer in the log.");
 
-    const appUrl =
-      process.env.APP_URL?.trim() ||
-      process.env.BETTER_AUTH_URL?.trim() ||
-      "http://localhost:3000";
-
     const result = await sendEmail({
       to: row.to,
       subject: row.subject,
       template: row.template as EmailTemplate,
-      react: templateFor(row.template as EmailTemplate, appUrl),
+      // `siteUrl`, not a second copy of the same fallback chain: an address
+      // that has been normalised once is the difference between a link the
+      // recipient can click and a bare host that no mail client will linkify.
+      react: templateFor(row.template as EmailTemplate, siteUrl),
     });
 
     revalidatePath("/settings/system");

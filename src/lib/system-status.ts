@@ -3,6 +3,7 @@ import "server-only";
 import { sql } from "drizzle-orm";
 
 import { db } from "@/lib/db";
+import { siteUrlConfigured } from "@/lib/site";
 
 /**
  * Never render a secret, or part of one.
@@ -42,9 +43,9 @@ export async function getSystemChecks(): Promise<SystemCheck[]> {
       // sitemap and every canonical link quietly point at localhost in
       // production, and nobody notices until a search engine has read them.
       name: "Canonical URL",
-      ok: Boolean(
-        process.env.APP_URL?.trim() || process.env.BETTER_AUTH_URL?.trim(),
-      ),
+      // Not `Boolean(APP_URL)`: a value that is set but unparseable falls back
+      // to localhost just the same, and this row exists to catch exactly that.
+      ok: siteUrlConfigured,
       hint: "APP_URL — the app's public address",
       detail: "Used by the sitemap, canonical links and invite links.",
     },

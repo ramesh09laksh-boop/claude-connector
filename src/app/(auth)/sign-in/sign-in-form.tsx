@@ -8,7 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function SignInForm({ redirectTo }: { redirectTo: string }) {
+export function SignInForm({
+  redirectTo,
+  resumeTo,
+}: {
+  redirectTo: string;
+  /** Set when signing in interrupted an OAuth authorisation. */
+  resumeTo?: string | null;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +41,14 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
       // Deliberately the same message whatever went wrong. Saying "no account
       // with that email" would let anyone test which addresses are registered.
       setFormError("That email and password don't match. Check both and try again.");
+      return;
+    }
+
+    // This sign-in interrupted an OAuth authorisation, so finish that rather
+    // than going to the dashboard. A full navigation, not the router: it hands
+    // off to an auth endpoint that redirects onward. See lib/oauth-resume.ts.
+    if (resumeTo) {
+      window.location.href = resumeTo;
       return;
     }
 

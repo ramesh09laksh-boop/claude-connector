@@ -1,12 +1,17 @@
 import { betterAuth } from "better-auth";
+import { createAuthMiddleware } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { organization } from "better-auth/plugins";
+// `mcp` has no `better-auth/plugins/mcp` subpath in 1.6.30 — it is missing from
+// the package's `exports` map, so the aggregate entry point is the only import
+// that resolves. Deliberately not the per-plugin path the docs suggest.
+import { mcp, organization } from "better-auth/plugins";
 import { count, eq } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import { user as userTable } from "@/lib/db/auth-schema";
 import { ac, roles } from "@/lib/permissions";
 import { sendEmail } from "@/lib/email";
+import { siteUrl } from "@/lib/site";
 import { seedBoardForTeam } from "@/lib/board-seed";
 import { assertUserCanBeDeleted, cleanUpDeletedUser } from "@/lib/account-deletion";
 import VerifyEmail from "@/emails/verify-email";
@@ -106,6 +111,35 @@ export const auth = betterAuth({
     },
   },
 
+  /**
+   * Force the consent screen on every MCP authorisation.
+   *
+   * Better Auth 1.6.30's `mcp` plugin shows a consent page only when the
+   * *client* asks for one with `prompt=consent` — unlike its OIDC provider,
+   * it never consults the `oauth_consent` table and never prompts on its own.
+   * Claude does not send `prompt`, so without this an authorisation code is
+   * minted the moment a signed-in user lands on the authorize URL, with nothing
+   * shown and nothing to approve.
+   *
+   * Claude's connector documentation is explicit that every connection requires
+   * user consent, so this rewrites the query on the way in. It is done here, on
+   * the endpoint itself, rather than by advertising a wrapper URL in the
+   * discovery document: a wrapper only covers clients that read discovery, and
+   * `/mcp/authorize` would still be reachable directly.
+   *
+   * The resumed-after-sign-in path is covered too — the plugin stores this
+   * query in a cookie and replays it, so the flag survives the round-trip.
+   */
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path !== "/mcp/authorize") return;
+      // Returned, not mutated: a before-hook is handed a shallow copy of the
+      // context, so assigning to `ctx.query` changes nothing. Only what comes
+      // back under `context` is merged into the request the endpoint sees.
+      return { context: { query: { ...ctx.query, prompt: "consent" } } };
+    }),
+  },
+
   databaseHooks: {
     user: {
       create: {
@@ -133,6 +167,11 @@ export const auth = betterAuth({
       "/change-password": { window: 60, max: 5 },
       "/delete-user": { window: 60, max: 3 },
       "/forget-password": { window: 60, max: 3 },
+      // Claude registers a *new* OAuth client on every fresh connection, so this
+      // is a brake on abuse rather than on normal use — a person adding the
+      // connector hits it once. Too tight here and legitimate connects fail.
+      "/mcp/register": { window: 60, max: 10 },
+      "/mcp/token": { window: 60, max: 30 },
     },
   },
 
@@ -153,6 +192,40 @@ export const auth = betterAuth({
         afterCreateTeam: async ({ team }) => {
           await seedBoardForTeam(team.id, team.name);
         },
+      },
+    }),
+
+    /**
+     * The OAuth 2.1 authorisation server behind `/mcp`.
+     *
+     * This is what makes Lanes installable as a Claude connector: dynamic client
+     * registration, S256 PKCE and refresh tokens, all of which Claude requires.
+     * The plugin wraps better-auth's OIDC provider — `oidcConfig` is that
+     * provider's options, not a second set of MCP ones.
+     */
+    mcp({
+      loginPage: "/sign-in",
+      /**
+       * The protected resource identifier, and the one value that is easy to get
+       * wrong. It must equal the URL the user types into Claude *exactly*, path
+       * and all — Claude compares them and refuses a mismatch. The plugin's
+       * default is the bare origin, which never matches a server mounted on a
+       * path.
+       *
+       * It follows that APP_URL/BETTER_AUTH_URL must be the public HTTPS origin
+       * in production; a stale localhost here breaks the connector rather than
+       * merely a canonical tag.
+       */
+      resource: `${siteUrl}/mcp`,
+      oidcConfig: {
+        loginPage: "/sign-in",
+        consentPage: "/oauth/consent",
+        // Without this there is no `registration_endpoint`, and Claude has no
+        // way to become a client of this server.
+        allowDynamicClientRegistration: true,
+        // The discovery document advertises S256 only, so accepting `plain`
+        // would mean honouring a downgrade nobody is allowed to ask for.
+        allowPlainCodeChallengeMethod: false,
       },
     }),
   ],

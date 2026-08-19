@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getBoardState, getBoardStateVersion } from "@/lib/boards";
+import { sessionActor } from "@/lib/actor";
 import { NotFoundError, requireBoardAccess } from "@/lib/board-guards";
 import { UnauthenticatedError } from "@/lib/auth-guards";
 
@@ -15,7 +16,7 @@ export async function GET(
   const { boardId } = await ctx.params;
 
   try {
-    const access = await requireBoardAccess(boardId);
+    const access = await requireBoardAccess(await sessionActor(), boardId);
     const clientVersion = new URL(request.url).searchParams.get("v");
     const version = await getBoardStateVersion(access.team.id);
 

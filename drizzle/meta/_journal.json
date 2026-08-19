@@ -15,6 +15,13 @@
       "when": 1787001123740,
       "tag": "0001_broad_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787142044504,
+      "tag": "0002_icy_stephen_strange",
+      "breakpoints": true
     }
   ]
 }

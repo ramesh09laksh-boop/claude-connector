@@ -1,5 +1,6 @@
 {
   "_note": "Reusable fixtures for Playwright runs against Lanes. Reuse these accounts; do not invent new ones per test. Local-only credentials against a throwaway Docker Postgres.",
+  "_reset": "The Docker volume was empty on 2026-08-19, so these accounts were recreated through the sign-up and onboarding UI. Grace Hopper was not recreated — nothing needed her — so the invite-link and organisation-switcher fixtures below are not currently seeded. Team ids change on every reset; re-read them from /teams if a run fails to find one.",
   "baseUrl": "http://localhost:3000",
   "accounts": {
     "owner": {
@@ -8,13 +9,15 @@
       "password": "lanes-owner-passphrase",
       "role": "first account on the instance, so also the platform admin",
       "organisation": "Ada's organisation",
-      "team": "Engineering"
+      "team": "Engineering",
+      "teamId": "sOZJC6nZ01QDTRu0H3rBlOFkBiT7ro9Z"
     },
     "joiner": {
       "name": "Grace Hopper",
       "email": "grace@lanes.test",
       "password": "grace-brand-new-passphrase",
       "_passwordNote": "changed from lanes-joiner-passphrase while testing the forgot-password flow",
+      "_seeded": false,
       "role": "joined Engineering through an invite link, later promoted to admin; also a member of Turing Institute, so she exercises the organisation switcher"
     },
     "outsider": {
@@ -23,11 +26,19 @@
       "password": "lanes-outsider-passphrase",
       "role": "belongs to a separate organisation; used for cross-tenant isolation probes",
       "organisation": "Turing Institute",
-      "team": "Cryptanalysis"
+      "team": "Cryptanalysis",
+      "teamId": "8GCw2RkHgzAFrfCyeGdqsSOsKikGjM04"
     }
   },
   "cards": {
     "sample": "Write the onboarding email",
     "second": "Fix the board polling"
+  },
+  "mcp": {
+    "_note": "The remote MCP server. scripts/mcp-oauth-probe.mjs drives the whole OAuth flow from the terminal and prints an access token; scripts/mcp-tool-probe.mjs takes that token and exercises every tool plus the cross-tenant refusals.",
+    "endpoint": "http://localhost:3000/mcp",
+    "probe": "node scripts/mcp-oauth-probe.mjs",
+    "toolProbe": "node scripts/mcp-tool-probe.mjs <access_token> 8GCw2RkHgzAFrfCyeGdqsSOsKikGjM04",
+    "_isolationNote": "Pass the outsider's teamId to the tool probe as the second argument — that is what makes it check that another organisation's board comes back as not-found rather than forbidden."
   }
 }

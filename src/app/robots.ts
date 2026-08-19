@@ -19,7 +19,20 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/api/", "/dashboard", "/teams", "/settings", "/invite"],
+        // `/mcp` and `/oauth` are machine endpoints, not pages: one speaks
+        // JSON-RPC and 401s without a token, the other only means anything
+        // inside an OAuth redirect. `/.well-known/` is deliberately *not*
+        // listed — those documents are meant to be fetched, and Anthropic's
+        // crawler-agnostic discovery request has to reach them.
+        disallow: [
+          "/api/",
+          "/dashboard",
+          "/teams",
+          "/settings",
+          "/invite",
+          "/mcp",
+          "/oauth",
+        ],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,

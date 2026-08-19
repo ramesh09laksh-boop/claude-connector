@@ -11,11 +11,11 @@ import { db } from "@/lib/db";
 import { teamInviteLink } from "@/lib/db/schema";
 import { member, teamMember } from "@/lib/db/auth-schema";
 import { logActivity } from "@/lib/activity";
+import { sessionActor } from "@/lib/actor";
 import {
   NotFoundError,
   requireOrgPermission,
   requireTeamAccess,
-  requireUser,
 } from "@/lib/board-guards";
 import { resolveInviteToken } from "@/lib/invites";
 import { orgRoles, roleRank, type OrgRole } from "@/lib/permissions";
@@ -46,8 +46,10 @@ export async function createInviteLink(input: {
       })
       .parse(input);
 
-    const access = await requireTeamAccess(parsed.teamId);
-    await requireOrgPermission(access.organizationId, { invitation: ["create"] });
+    const access = await requireTeamAccess(await sessionActor(), parsed.teamId);
+    await requireOrgPermission(access.actor, access.organizationId, {
+      invitation: ["create"],
+    });
 
     // The privilege-escalation hole in this feature: without it an Admin mints
     // an Owner link and hands themselves the organisation.
@@ -56,7 +58,7 @@ export async function createInviteLink(input: {
     }
 
     // An unconfirmed address shouldn't be handing out access to a board.
-    if (!access.session.user.emailVerified) {
+    if (!access.actor.emailVerified) {
       throw new NotFoundError(
         "Confirm your email address before creating invite links.",
       );
@@ -85,7 +87,7 @@ export async function createInviteLink(input: {
         organizationId: access.organizationId,
         teamId: parsed.teamId,
         role: parsed.role,
-        createdById: access.session.user.id,
+        createdById: access.actor.userId,
         expiresAt,
       });
     });
@@ -95,7 +97,7 @@ export async function createInviteLink(input: {
     await logActivity(
       "invite.created",
       { teamId: parsed.teamId, role: parsed.role, expiresAt: expiresAt.toISOString() },
-      access.session.user.id,
+      access.actor.userId,
     );
 
     revalidatePath(`/teams/${parsed.teamId}/members`);
@@ -117,8 +119,10 @@ export async function revokeInviteLink(input: {
 
     if (!link) throw new NotFoundError("That link no longer exists.");
 
-    const access = await requireTeamAccess(link.teamId);
-    await requireOrgPermission(access.organizationId, { invitation: ["cancel"] });
+    const access = await requireTeamAccess(await sessionActor(), link.teamId);
+    await requireOrgPermission(access.actor, access.organizationId, {
+      invitation: ["cancel"],
+    });
 
     await db
       .update(teamInviteLink)
@@ -128,7 +132,7 @@ export async function revokeInviteLink(input: {
     await logActivity(
       "invite.revoked",
       { teamId: link.teamId, role: link.role },
-      access.session.user.id,
+      access.actor.userId,
     );
 
     revalidatePath(`/teams/${link.teamId}/members`);
@@ -147,7 +151,7 @@ export async function acceptInviteLink(input: {
 }): Promise<ActionResult<{ teamId: string; alreadyMember: boolean }>> {
   return runAction(async () => {
     const parsed = z.object({ token: z.string().min(1).max(200) }).parse(input);
-    const session = await requireUser();
+    const actor = await sessionActor();
 
     const invite = await resolveInviteToken(parsed.token);
 
@@ -167,7 +171,7 @@ export async function acceptInviteLink(input: {
       .where(
         and(
           eq(member.organizationId, invite.organizationId),
-          eq(member.userId, session.user.id),
+          eq(member.userId, actor.userId),
         ),
       )
       .limit(1);
@@ -179,7 +183,7 @@ export async function acceptInviteLink(input: {
       // owns only the link.
       await auth.api.addMember({
         body: {
-          userId: session.user.id,
+          userId: actor.userId,
           organizationId: invite.organizationId,
           role: invite.role,
         },
@@ -192,7 +196,7 @@ export async function acceptInviteLink(input: {
       .where(
         and(
           eq(teamMember.teamId, invite.teamId),
-          eq(teamMember.userId, session.user.id),
+          eq(teamMember.userId, actor.userId),
         ),
       )
       .limit(1);
@@ -206,7 +210,7 @@ export async function acceptInviteLink(input: {
         .values({
           id: crypto.randomUUID(),
           teamId: invite.teamId,
-          userId: session.user.id,
+          userId: actor.userId,
           createdAt: new Date(),
         })
         .onConflictDoNothing();
@@ -219,7 +223,7 @@ export async function acceptInviteLink(input: {
       await logActivity(
         "member.joined",
         { teamId: invite.teamId, via: "invite_link", role: invite.role },
-        session.user.id,
+        actor.userId,
       );
     }
 
