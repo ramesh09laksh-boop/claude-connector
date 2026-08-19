@@ -67,6 +67,40 @@ check(
   `${members.structuredContent.members.length} member(s)`,
 );
 
+// ------------------------------------------------- ids visible to the model
+//
+// Asserted against `content[0].text`, deliberately, not `structuredContent`.
+// Not every MCP client shows structured output to the model, so an id that only
+// exists there may as well not exist: the first version of this server returned
+// a board as names and card counts, and an agent could create a column but had
+// no way to name one in any other call. These checks all passed at the time,
+// because they read the structured copy — the same blind spot.
+console.log("\nids the model can actually see");
+const textOf = (r) => r.content?.[0]?.text ?? "";
+
+check(
+  "lanes_get_board text carries columnId",
+  columns.every((c) => textOf(board).includes(c.columnId)),
+  `${columns.length} columns`,
+);
+check(
+  "lanes_get_board text carries cardId",
+  columns.flatMap((c) => c.cards).every((c) => textOf(board).includes(c.cardId)),
+  `${columns.flatMap((c) => c.cards).length} cards`,
+);
+check(
+  "lanes_get_current_user text carries userId",
+  textOf(me).includes(me.structuredContent.userId),
+);
+check(
+  "lanes_list_teams text carries teamId",
+  textOf(teams).includes(team.teamId),
+);
+check(
+  "lanes_list_team_members text carries userId",
+  members.structuredContent.members.every((m) => textOf(members).includes(m.userId)),
+);
+
 // ---------------------------------------------------------------- card writes
 console.log("\ncard writes");
 const todo = columns.find((c) => c.name === "To Do") ?? columns[0];
@@ -103,6 +137,10 @@ check(
   detail.structuredContent.columnName === todo.name,
   `${detail.structuredContent.title} in ${detail.structuredContent.columnName}`,
 );
+check(
+  "lanes_get_card text carries cardId and columnId",
+  textOf(detail).includes(newCard.cardId) && textOf(detail).includes(todo.columnId),
+);
 
 const moved = await call("lanes_move_card", {
   cardId: newCard.cardId,
@@ -123,6 +161,15 @@ check(
   "lanes_search_cards",
   search.structuredContent.total >= 1,
   `${search.structuredContent.total} hit(s)`,
+);
+check(
+  "lanes_search_cards text carries cardId, columnId and teamId",
+  search.structuredContent.hits.every(
+    (h) =>
+      textOf(search).includes(h.cardId) &&
+      textOf(search).includes(h.columnId) &&
+      textOf(search).includes(h.teamId),
+  ),
 );
 
 const mine = await call("lanes_search_cards", { assignedToMe: true });

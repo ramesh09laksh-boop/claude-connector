@@ -53,13 +53,47 @@ const columnIdArg = z
   .uuid()
   .describe("Column id (a UUID), as returned by lanes_get_board.");
 
-/** Board state is returned by every write, so the agent sees the result at once. */
+/** A date an agent can read back to us, or nothing at all. */
+function due(dueDate: string | null): string {
+  return dueDate ? ` due:${dueDate}` : "";
+}
+
+/**
+ * Board state is returned by every write, so the agent sees the result at once.
+ *
+ * **Every id goes in this text.** `structuredContent` carries them too, but not
+ * every MCP client puts structured output in front of the model — several show
+ * only `content`. This tool is documented as the place column and card ids come
+ * from, so a summary of names and counts made the whole write surface unusable:
+ * with no `columnId` to target, an agent cannot create a card, and cannot delete
+ * a column it created by mistake either.
+ *
+ * Compact on purpose — one line per card — so a large board stays well inside a
+ * client's tool-result limit. `lanes_search_cards` is the paginated way through
+ * a board too big to print.
+ */
 function boardSummary(state: BoardState | null): string {
   if (!state) return "The board is no longer available.";
-  const columns = state.columns
-    .map((c) => `${c.name} (${c.cards.length})`)
-    .join(" · ");
-  return `${state.boardName} — ${state.teamName}\n${columns}`;
+
+  const header = `${state.boardName} — team ${state.teamName} (teamId: ${state.teamId})`;
+
+  const columns = state.columns.map((column) => {
+    const heading = `\n[${column.position}] ${column.name} — ${column.cards.length} card${column.cards.length === 1 ? "" : "s"}  (columnId: ${column.id})`;
+
+    if (column.cards.length === 0) return `${heading}\n    (empty)`;
+
+    const cards = column.cards
+      .map(
+        (card) =>
+          `    ${card.position}. ${card.title}  (cardId: ${card.id})` +
+          `${card.assignee ? ` assignee:${card.assignee.name}` : ""}${due(card.dueDate)}`,
+      )
+      .join("\n");
+
+    return `${heading}\n${cards}`;
+  });
+
+  return `${header}\n${columns.join("\n")}`;
 }
 
 function boardPayload(state: BoardState | null) {
@@ -158,7 +192,10 @@ export function createLanesMcpServer(actor: Actor): McpServer {
           content: [
             {
               type: "text" as const,
-              text: `${a.name} <${a.email}>${a.emailVerified ? "" : " (email not confirmed)"}`,
+              // The userId is here because assigning a card to "me" needs it.
+              text:
+                `${a.name} <${a.email}>${a.emailVerified ? "" : " (email not confirmed)"}\n` +
+                `userId: ${a.userId}`,
             },
           ],
           structuredContent: {
@@ -316,11 +353,18 @@ export function createLanesMcpServer(actor: Actor): McpServer {
           content: [
             {
               type: "text" as const,
+              // The three ids a follow-up call needs — move it, re-assign it, or
+              // look at the rest of its board — rather than only prose.
               text: [
                 `${card.title}`,
                 `${card.teamName} › ${card.columnName}`,
-                card.assignee ? `Assigned to ${card.assignee.name}` : "Unassigned",
-                card.dueDate ? `Due ${card.dueDate}` : "No due date",
+                `cardId: ${card.cardId}`,
+                `columnId: ${card.columnId}`,
+                `teamId: ${card.teamId}`,
+                card.assignee
+                  ? `assignee: ${card.assignee.name} (userId: ${card.assignee.userId})`
+                  : "assignee: nobody",
+                card.dueDate ? `due: ${card.dueDate}` : "due: not set",
                 card.description ? `\n${card.description}` : "",
               ]
                 .filter(Boolean)
@@ -405,7 +449,12 @@ export function createLanesMcpServer(actor: Actor): McpServer {
                   result.hits
                     .map(
                       (h) =>
-                        `${h.title} — ${h.teamName} › ${h.columnName}${h.assignee ? ` · ${h.assignee.name}` : ""}${h.dueDate ? ` · due ${h.dueDate}` : ""}\n  cardId: ${h.cardId}`,
+                        `${h.title} — ${h.teamName} › ${h.columnName}` +
+                        `${h.assignee ? ` · ${h.assignee.name}` : ""}${h.dueDate ? ` · due ${h.dueDate}` : ""}\n` +
+                        // columnId and teamId as well as cardId: moving a card
+                        // found here needs the column it is in, and a search can
+                        // span several boards.
+                        `  cardId: ${h.cardId}  columnId: ${h.columnId}  teamId: ${h.teamId}`,
                     )
                     .join("\n")
                 : "No cards matched.",
